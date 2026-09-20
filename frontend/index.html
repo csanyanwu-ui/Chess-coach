@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1B1410;
+    --surface:#241C17;
+    --surface-2:#2E241D;
+    --border:#3D3128;
+    --text:#EDE4D8;
+    --text-muted:#A0917F;
+    --cream:#EDE4D8;
+    --walnut:#8B5A2B;
+    --gold:#C9A24B;
+    --loss:#B4573F;
+    --win:#6E8F5C;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    line-height:1.55;
+  }
+  h1,h2,h3,.brand{font-family:'Fraunces',serif;}
+
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:30px 40px;
+    border-bottom:1px solid var(--border);
+  }
+  .brand{
+    font-size:21px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .brand .sq{
+    width:16px;height:16px;
+    background:
+      linear-gradient(45deg, var(--cream) 25%, transparent 25%) -8px 0,
+      linear-gradient(-45deg, var(--cream) 25%, transparent 25%) -8px 0,
+      linear-gradient(45deg, transparent 75%, var(--cream) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--cream) 75%);
+    background-size:8px 8px;
+    background-color:var(--walnut);
+  }
+
+  main{max-width:880px;margin:0 auto;padding:44px 24px 90px;}
+
+  .setup{
+    display:flex;
+    gap:12px;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    padding:24px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    margin-bottom:36px;
+  }
+  .field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:200px;}
+  .field label{font-size:13px;color:var(--text-muted);}
+  input{
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:11px 12px;
+    border-radius:6px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    width:100%;
+  }
+  input::placeholder{color:var(--text-muted);}
+  button{
+    background:var(--gold);
+    color:#1B1410;
+    border:none;
+    font-weight:600;
+    padding:12px 22px;
+    border-radius:6px;
+    cursor:pointer;
+    font-size:14px;
+    font-family:'Inter',sans-serif;
+    white-space:nowrap;
+    transition:transform .08s ease;
+  }
+  button:hover{transform:translateY(-1px);}
+  button:disabled{opacity:.5;cursor:default;transform:none;}
+
+  .source-note{
+    font-size:13px;
+    color:var(--text-muted);
+    margin:-16px 0 32px;
+    display:none;
+  }
+  .source-note.show{display:block;}
+  .source-note.fallback{color:var(--gold);}
+
+  #results{display:none;}
+
+  .record-row{
+    display:flex;
+    gap:32px;
+    margin-bottom:36px;
+    flex-wrap:wrap;
+  }
+  .record-stat{}
+  .record-stat .num{font-family:'Fraunces',serif;font-size:32px;font-weight:600;display:block;}
+  .record-stat .label{font-size:13px;color:var(--text-muted);}
+  .record-stat.win .num{color:var(--win);}
+  .record-stat.loss .num{color:var(--loss);}
+
+  h2{font-size:15px;color:var(--text-muted);font-weight:500;margin:0 0 16px;letter-spacing:.2px;}
+
+  .phase-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin-bottom:44px;
+  }
+  .phase-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:18px;
+  }
+  .phase-card .phase-name{
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:12px;
+    text-transform:capitalize;
+  }
+  .phase-row{display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);margin-bottom:4px;}
+  .phase-row .n{color:var(--text);font-variant-numeric:tabular-nums;}
+  .phase-row.blunder .n{color:var(--loss);}
+
+  table{width:100%;border-collapse:collapse;margin-bottom:44px;}
+  th,td{text-align:left;padding:10px 12px;font-size:14px;border-bottom:1px solid var(--border);}
+  th{color:var(--text-muted);font-weight:500;font-size:13px;}
+  td.wr{font-variant-numeric:tabular-nums;text-align:right;}
+  td.wr.high{color:var(--win);}
+  td.wr.low{color:var(--loss);}
+
+  .coaching{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:28px;
+  }
+  .coaching-summary{font-size:16px;margin:0 0 24px;}
+  .coaching-cols{display:grid;grid-template-columns:1fr 1fr;gap:28px;}
+  .coaching-col h3{font-size:13px;color:var(--text-muted);font-weight:600;margin:0 0 12px;}
+  .coaching-col ul{margin:0;padding-left:18px;}
+  .coaching-col li{margin-bottom:10px;font-size:14px;}
+  .strengths h3{color:var(--win);}
+  .focus h3{color:var(--gold);}
+  .drills{grid-column:1/-1;margin-top:8px;padding-top:20px;border-top:1px solid var(--border);}
+
+  .loading,.error{color:var(--text-muted);font-size:14px;}
+  .error{color:var(--loss);}
+
+  @media (max-width:640px){
+    .phase-grid{grid-template-columns:1fr;}
+    .coaching-cols{grid-template-columns:1fr;}
+    header{padding:22px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span class="sq"></span>Chess Coach</div>
+</header>
+
+<main>
+  <div class="setup">
+    <div class="field">
+      <label for="username">Lichess username</label>
+      <input id="username" placeholder="e.g. DrNykterstein" />
+    </div>
+    <button id="runBtn">Analyze recent games</button>
+  </div>
+
+  <div id="status" class="loading" style="display:none;">Loading…</div>
+  <div id="sourceNote" class="source-note"></div>
+
+  <div id="results">
+    <div class="record-row" id="recordRow"></div>
+
+    <h2>Mistakes by game phase</h2>
+    <div class="phase-grid" id="phaseGrid"></div>
+
+    <h2>Opening repertoire</h2>
+    <table id="openingTable">
+      <thead><tr><th>Opening</th><th>Games</th><th>W–L–D</th><th style="text-align:right;">Win rate</th></tr></thead>
+      <tbody id="openingBody"></tbody>
+    </table>
+
+    <h2>AI coaching</h2>
+    <div class="coaching">
+      <p class="coaching-summary" id="coachSummary"></p>
+      <div class="coaching-cols">
+        <div class="coaching-col strengths">
+          <h3>Strengths</h3>
+          <ul id="strengthsList"></ul>
+        </div>
+        <div class="coaching-col focus">
+          <h3>Focus areas</h3>
+          <ul id="focusList"></ul>
+        </div>
+        <div class="coaching-col drills">
+          <h3>Suggested practice</h3>
+          <ul id="drillsList"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+async function runAnalysis() {
+  const btn = document.getElementById('runBtn');
+  const status = document.getElementById('status');
+  const results = document.getElementById('results');
+  const sourceNote = document.getElementById('sourceNote');
+  const username = document.getElementById('username').value.trim();
+
+  if (!username) { alert('Enter a Lichess username first.'); return; }
+
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.className = 'loading';
+  status.textContent = 'Fetching recent games from Lichess…';
+  results.style.display = 'none';
+  sourceNote.classList.remove('show', 'fallback');
+
+  try {
+    const profileRes = await fetch(`/api/profile?username=${encodeURIComponent(username)}&max_games=20`, {method: 'POST'});
+    if (!profileRes.ok) throw new Error('Could not build a profile for that username');
+    const profile = await profileRes.json();
+
+    status.textContent = 'Computing stats…';
+    const statsRes = await fetch(`/api/profile/${encodeURIComponent(username)}/stats`);
+    const stats = await statsRes.json();
+
+    status.textContent = 'Generating coaching feedback…';
+    const coachRes = await fetch(`/api/profile/${encodeURIComponent(username)}/coaching`);
+    const coaching = await coachRes.json();
+
+    renderResults(stats, coaching);
+    status.style.display = 'none';
+    results.style.display = 'block';
+
+    if (profile.data_source === 'fallback') {
+      sourceNote.textContent = `Note: Lichess didn't have enough analyzed games for "${username}", so this is illustrative sample data, not a real analysis of their games.`;
+      sourceNote.classList.add('show', 'fallback');
+    } else {
+      sourceNote.textContent = `Live analysis based on ${stats.games_analyzed} of ${stats.games_fetched} recent games from Lichess.`;
+      sourceNote.classList.add('show');
+    }
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = 'Something went wrong: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderResults(stats, coaching) {
+  document.getElementById('recordRow').innerHTML = `
+    <div class="record-stat win"><span class="num">${stats.win_rate}%</span><span class="label">Win rate</span></div>
+    <div class="record-stat loss"><span class="num">${stats.loss_rate}%</span><span class="label">Loss rate</span></div>
+    <div class="record-stat"><span class="num">${stats.draw_rate}%</span><span class="label">Draw rate</span></div>
+    <div class="record-stat"><span class="num">${stats.avg_blunders_per_game}</span><span class="label">Avg blunders / game</span></div>
+  `;
+
+  const phaseGrid = document.getElementById('phaseGrid');
+  phaseGrid.innerHTML = stats.phase_breakdown.map(p => `
+    <div class="phase-card">
+      <div class="phase-name">${p.phase}</div>
+      <div class="phase-row blunder"><span>Blunders</span><span class="n">${p.blunders}</span></div>
+      <div class="phase-row"><span>Mistakes</span><span class="n">${p.mistakes}</span></div>
+      <div class="phase-row"><span>Inaccuracies</span><span class="n">${p.inaccuracies}</span></div>
+    </div>
+  `).join('');
+
+  const openingBody = document.getElementById('openingBody');
+  openingBody.innerHTML = stats.opening_repertoire.slice(0, 8).map(o => `
+    <tr>
+      <td>${o.name}</td>
+      <td>${o.games}</td>
+      <td>${o.wins}–${o.losses}–${o.draws}</td>
+      <td class="wr ${o.win_rate >= 55 ? 'high' : o.win_rate <= 35 ? 'low' : ''}">${o.win_rate}%</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('coachSummary').textContent = coaching.summary;
+  fillList('strengthsList', coaching.strengths);
+  fillList('focusList', coaching.focus_areas);
+  fillList('drillsList', coaching.drills);
+}
+
+function fillList(id, items) {
+  document.getElementById(id).innerHTML = items.map(i => `<li>${i}</li>`).join('');
+}
+
+document.getElementById('runBtn').addEventListener('click', runAnalysis);
+document.getElementById('username').addEventListener('keydown', e => { if (e.key === 'Enter') runAnalysis(); });
+</script>
+</body>
+</html>
