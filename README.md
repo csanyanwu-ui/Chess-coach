@@ -1,105 +1,81 @@
 # Chess Coach
 
-Pulls a player's recent games from Lichess, analyzes where they're actually
-losing points — by game phase, by opening — and generates specific,
-data-grounded coaching feedback with Claude.
+A web app that pulls a player's recent games from Lichess, finds where they're losing points, and gives coaching feedback based on their actual stats.
 
-**Live demo:** _[]_
+## Why I built this
 
-## Why chess
-
-trophi.ai's pitch is turning gameplay data into personalized coaching —
-starting with sim racing and Rocket League. Chess is a clean second proof
-of the same idea: competitive game, publicly available match data, and a
-real gap between "here's what happened" and "here's what to actually work
-on." Lichess also makes this unusually easy to do *properly*: its public
-API returns real computer analysis (move-by-move evaluations and
-inaccuracy/mistake/blunder judgments) for free, with no API key required —
-so this project pulls live data by default instead of mocking it.
+I wanted a project that takes real, messy data and turns it into something a person can actually use, which ties into the data-focused courses I'm taking. Chess is a good fit because Lichess's public API returns computer analysis for analyzed games (move-by-move evaluations and mistake labels) for free. That meant I could work with real data instead of making it up, and focus on the analysis and the feedback.
 
 ## What it does
 
-1. Fetches a Lichess user's recent **analyzed** games via the public API.
-2. Breaks down mistakes by **game phase** (opening / middlegame / endgame)
-   and by **opening repertoire**, so patterns are visible instead of buried
-   in a single aggregate blunder count.
-3. Sends those stats to Claude, which generates a summary, strengths, focus
-   areas, and specific practice suggestions grounded in the real numbers.
-4. Displays it all in a dashboard.
+1. Fetches a player's recent analyzed games from the Lichess public API (no API key needed).
+2. Breaks down inaccuracies, mistakes and blunders by game phase (opening, middlegame, endgame) and by opening.
+3. Sends those stats to the Claude API, which writes a short summary, strengths, focus areas and practice suggestions.
+4. Shows everything on a simple dashboard.
 
-If a username has too few analyzed games (common for new or casual
-accounts — not every game gets computer analysis), the app **falls back to
-clearly-labeled synthetic data** rather than failing outright or silently
-pretending it's real. The frontend shows which one you're looking at.
+If a player doesn't have enough analyzed games, the app switches to sample data and labels it clearly on the page. If there's no Claude API key or the call fails, it uses template-based coaching instead.
 
-## Architecture
+## How it's built
+
+- **Backend:** Python, FastAPI, Pydantic, httpx
+- **Frontend:** HTML and JavaScript, served by the backend
+- **AI:** Claude API (Anthropic SDK)
+- **Testing:** pytest
+- **Containers / cloud:** Dockerfile included, with a written guide for deploying to AWS ECS Fargate ([AWS_DEPLOY.md](AWS_DEPLOY.md))
+
+The backend is split into small modules:
+
+| File | What it does |
+|---|---|
+| `lichess_client.py` | Calls the Lichess games API |
+| `parser.py` | Turns Lichess's JSON into a simple `GameRecord` format. It's the only file that knows about Lichess, so the rest of the code doesn't care where the data came from |
+| `stats.py` | Calculates the phase and opening breakdowns |
+| `ai_coach.py` | Builds the prompt, calls Claude, falls back to templates if needed |
+| `fallback_data.py` | Generates sample games when live data isn't available |
+| `main.py` | FastAPI routes |
+
+## Things I ran into
+
+**Counting the right player's mistakes.** Lichess's analysis covers every move in the game, from both players. Moves alternate between white and black, so the stats have to check whether each move belongs to the player being analyzed, based on the move's position and the player's colour. Getting this wrong would blame the player for their opponent's blunders, so there's a unit test specifically for this case.
+
+**Not every game has analysis.** Computer analysis only exists for some games, so newer or casual accounts often don't have enough data. Instead of crashing or quietly showing fake numbers, the app falls back to sample data and the dashboard says so.
+
+**Keeping the AI part optional.** The coaching depends on an external API that might be missing or down. The app checks for a key and catches failures, then uses template-based feedback so it always returns something useful.
+
+**Known limitation:** game phase is based on move count (first 10 plies = opening, 11 to 30 = middlegame, after that = endgame) instead of the pieces left on the board. Counting material would be more accurate, and it's on my list.
+
+## Running it locally
+
+With Python:
 
 ```
-┌──────────┐   ┌───────────────────────────────────────────────────┐
-│ Frontend │──▶│ FastAPI backend                                    │
-│ (HTML/JS)│   │ ┌───────────────┐ ┌────────┐ ┌───────┐ ┌─────────┐│
-│          │◀──│ │lichess_client │▶│ parser │▶│ stats │▶│ai_coach ││
-└──────────┘   │ └───────┬───────┘ └────────┘ └───────┘ └────┬────┘│
-                │         │ (fails / too few games)           │     │
-                │         ▼                                    ▼     │
-                │  ┌──────────────┐                     Claude API  │
-                │  │fallback_data │              (falls back to     │
-                │  └──────────────┘               template if no    │
-                └───────────────────────────────── key or call fails)┘
-```
-
-- **`lichess_client.py`** — real HTTP calls to Lichess's public games API (no auth needed).
-- **`fallback_data.py`** — synthetic data generator matching the same `GameRecord` shape, used only when live data is unavailable, and clearly flagged as such via `data_source` in the API response.
-- **`parser.py`** — Lichess-specific JSON parsing. This is the only file that knows Lichess's schema; everything past it works off `GameRecord`.
-- **`stats.py`** — pure functions: phase-based mistake breakdown, opening repertoire win rates. Unit tested against a realistic fixture, including a test that specifically catches a ply-parity bug (attributing the opponent's blunders to the player).
-- **`ai_coach.py`** — builds the coaching prompt, calls Claude, falls back to deterministic template coaching if no API key is set or the call fails.
-- **`main.py`** — FastAPI routes; serves the frontend as static files from the same container.
-
-### A deliberate simplification, stated plainly
-
-Game phase is approximated by **ply count** (opening = first 10 plies,
-middlegame = 11-30, endgame = beyond) rather than counting pieces on the
-board. A material-based phase detector would be more accurate but wasn't
-worth the time on this build — this is called out in the code comments,
-not hidden.
-
-## Running locally
-
-```bash
 cd backend
-python -m venv venv && source venv/bin/activate
+python -m venv venv
+source venv/bin/activate        # on Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-cp .env.example .env   # optional — add ANTHROPIC_API_KEY for real AI coaching
+cp .env.example .env            # optional: add ANTHROPIC_API_KEY for AI coaching
 uvicorn app.main:app --reload --port 8000
 ```
 
-Open `http://localhost:8000`, enter any active Lichess username (e.g. a
-username you recognize from lichess.org), click **Analyze recent games**.
+With Docker (from the project root):
 
-Run tests:
-```bash
+```
+docker build -t chess-coach -f backend/Dockerfile .
+docker run -p 8000:8000 --env-file backend/.env chess-coach
+```
+
+Then open http://localhost:8000 and enter a Lichess username.
+
+Run the tests:
+
+```
+cd backend
 pytest tests/ -v
 ```
 
-## Deploying to AWS
+## What I'd add next
 
-See [`AWS_DEPLOY.md`](./AWS_DEPLOY.md) for the full ECS Fargate walkthrough.
-
-## What's next
-
-- **Real material-based phase detection** instead of the ply-count proxy.
-- **Time-trouble analysis** — Lichess includes per-move clock data in PGN
-  comments; parsing that would add "you're blundering when low on time"
-  as its own coaching signal.
-- **Historical trend tracking** — store profiles over time (Postgres) to
-  show "your blunder rate is improving" instead of a single snapshot.
-- **Puzzle recommendations** — Lichess also has a public puzzle API; drills
-  could link directly to puzzles matching a player's specific weakness
-  instead of just describing what to practice.
-- **Infrastructure as code** — the AWS steps are manual for now; Terraform
-  or CDK would make deployment reproducible.
-
-## Tech stack
-
-FastAPI · Pydantic · httpx · Lichess public API · Claude API (Anthropic SDK) · vanilla JS/HTML frontend · Docker · AWS ECS Fargate
+- Phase detection based on material instead of move count
+- Time-trouble analysis using Lichess clock data
+- Saving results over time to track improvement
+- Linking to Lichess puzzles that match a player's weak spots
