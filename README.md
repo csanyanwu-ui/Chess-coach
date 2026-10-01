@@ -4,7 +4,7 @@ Pulls a player's recent games from Lichess, analyzes where they're actually
 losing points — by game phase, by opening — and generates specific,
 data-grounded coaching feedback with Claude.
 
-**Live demo:** _[add your deployed URL here]_
+**Live demo:** _[]_
 
 ## Why chess
 
